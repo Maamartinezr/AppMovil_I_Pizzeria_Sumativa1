@@ -1,6 +1,8 @@
 # Aplicación de gestión para pizzería en Kotlin
 
-Proyecto de consola desarrollado progresivamente para las Partes 1, 2 y 3 de la actividad. Implementa registro de clientes y pedidos, inventario, promociones y conceptos avanzados de Kotlin.
+Proyecto de consola desarrollado progresivamente a lo largo de las 3 semanas de la 
+Experiencia 1.
+Implementa registro de clientes y pedidos, inventario, promociones y conceptos avanzados de Kotlin.
 
 ## Requisitos
 
@@ -17,7 +19,7 @@ java -jar pizzeria.jar
 
 Si la instalación de Kotlin no incluye la biblioteca de reflexión, agrega `kotlin-reflect.jar` al classpath al compilar y ejecutar.
 
-## Contenido de la Parte 3
+## Contenido de la Sumativa 1
 
 - Regex para validar correos y validar/formatear teléfonos; los campos se vuelven a solicitar ante un formato incorrecto.
 - Rangos `1..100` para la cantidad de pizzas y un rango de fechas promocional para el año 2026.
