@@ -2,7 +2,7 @@
 
 Aplicación de consola educativa que simula funciones centrales de una pizzería: registrar clientes y pedidos, validar datos, verificar inventario, calcular precios y promociones, asignar repartidores y mostrar reportes. El proyecto evolucionó en tres partes, aplicando progresivamente fundamentos y utilidades avanzadas de Kotlin.
 
-> **Alcance:** esta entrega es un prototipo ejecutable en la JVM, no una aplicación Android de producción. El inventario, los repartidores y los pedidos viven solo en memoria durante la ejecución. El README incluye una propuesta para llevar la solución a una plataforma real.
+> **Alcance:** esta entrega es un prototipo ejecutable en la JVM, no una aplicación Android de producción. Clientes, productos, inventario y pedidos se conservan en memoria solo durante la ejecución. El programa genera `resumen_pedidos.txt` en la carpeta desde donde se ejecuta.
 
 ## Contenido
 
@@ -61,12 +61,14 @@ El proyecto declara Kotlin Reflection en Gradle para inspeccionar anotaciones, m
 Al iniciar, la consola solicita:
 
 1. Nombre y dirección del cliente.
-2. Teléfono internacional con el formato `+XX (XXX) XXX-XXXX`.
+2. Teléfono internacional con formato `+56 (912) 345-6789`.
 3. Correo con formato `nombre@dominio.com`.
 4. Nombre y precio de la pizza.
 5. Cantidad entre 1 y 100 y notas opcionales.
 
-Después valida y procesa el pedido, muestra si hay stock, presenta el resumen de cobro y ejecuta demostraciones de las herramientas avanzadas de la Parte 3. Por ejemplo, para el teléfono se puede ingresar `+56 (912) 345-6789`.
+El programa registra cliente y producto en conjuntos (`MutableSet`). Si se intenta registrar nuevamente una entidad con la misma clave de negocio, la operación se rechaza: para clientes, nombre y correo; para productos, nombre y categoría. La demostración realiza un intento duplicado explícito para mostrar el resultado sin agregarlo al registro.
+
+Después valida y procesa el pedido, muestra si hay stock y genera el resumen tanto en consola como en `resumen_pedidos.txt`. El archivo se crea o sobrescribe en el directorio de trabajo desde el que se ejecuta `gradle run`.
 
 ## Evolución de las tres partes
 
@@ -80,18 +82,19 @@ La solución avanzó hacia funciones reutilizables, colecciones y POO. Se añadi
 
 ### Parte 3 — Kotlin avanzado y demostración integrada
 
-Se agregaron expresiones regulares para validar correo y teléfono, rangos para cantidades y fechas promocionales, y la anotación `@Promocionable`, consultada con Reflection. `Pedido` sobrecarga `+` para combinar pedidos del mismo cliente y volver a calcular sus importes; `Producto` y `Cliente` comparan igualdad por sus claves de negocio y tienen `hashCode()` coherente. Se implementó desestructuración de ambos modelos y una demostración que imprime pedidos combinados, productos promocionables, deduplicación y metadatos de clases.
+Se agregaron Regex para validar correo y teléfono, rangos para cantidades y fechas promocionales, y `@Promocionable`, consultada mediante Reflection. `Pedido` sobrecarga `+` para combinar pedidos del mismo cliente y recalcular importes. `Producto` y `Cliente` comparan igualdad por claves de negocio y tienen `hashCode()` coherente. Los registros reales en `MutableSet` impiden duplicados. Se implementó desestructuración, se comparan `==` y `===`, y el programa guarda en archivo de texto el mismo resumen integrado que presenta en consola, junto con la demostración y los resultados de Reflection.
 
 ## Reglas de negocio del prototipo
 
 - Cada pizza consume una unidad de cada ingrediente de su receta (masa, salsa y queso).
 - El inventario inicial de ejemplo es de 100 unidades por ingrediente. Se descuenta solo si todos los ingredientes están disponibles.
-- El ejemplo usa un impuesto del 19 %, que se calcula sobre el subtotal después de descuentos. **No es una recomendación tributaria**: la tasa y la base imponible deben ser confirmadas para el país y el negocio.
+- El ejemplo usa un impuesto del 19 %, calculado sobre el subtotal después de descuentos. **No es una recomendación tributaria**: la tasa y la base imponible deben confirmarse para el país y el negocio.
 - Se aplica 10 % de descuento al subtotal cuando el pedido contiene más de tres pizzas.
-- Los productos anotados con `@Promocionable` pueden recibir 15 % sobre su propio subtotal entre el 1 de enero y el 31 de diciembre de 2026. En este ejercicio, el descuento por cantidad y la promoción se acumulan, con límite máximo igual al subtotal. Para producción, deben definirse reglas de prioridad y acumulación sin ambigüedad.
+- Los productos anotados con `@Promocionable` pueden recibir 15 % sobre su propio subtotal entre el 1 de enero y el 31 de diciembre de 2026. Los descuentos se acumulan, con límite máximo igual al subtotal. Para producción, deben definirse reglas de prioridad y acumulación sin ambigüedad.
 - El repartidor se elige de una lista fija en memoria según distancia. No se calcula una ruta ni disponibilidad en tiempo real.
 - La confirmación por correo es solo un mensaje de consola; no se envía un correo real.
-- La combinación de pedidos se muestra como demostración y no vuelve a reservar ingredientes ni añade el pedido de demostración al registro original.
+- El pedido combinado es una demostración y no vuelve a reservar inventario ni se agrega al registro de pedidos reales.
+- La unicidad solo se mantiene mientras el programa está en ejecución; no persiste entre ejecuciones.
 
 ## Arquitectura propuesta para una plataforma real
 
@@ -110,7 +113,7 @@ Este prototipo puede servir como ejercicio de lógica, pero una aplicación móv
 - Mantener precios, descuentos, impuestos e inventario como autoridad en el servidor; el total enviado por el móvil nunca debe aceptarse sin recalcularlo.
 - Persistir datos en una base relacional como PostgreSQL. Las operaciones de crear pedido y reservar stock deben ejecutarse en una transacción para evitar sobreventa ante pedidos simultáneos.
 - Guardar pedidos con estados definidos —por ejemplo, `RECIBIDO`, `EN_PREPARACION`, `LISTO`, `EN_CAMINO`, `ENTREGADO`, `CANCELADO`— y registrar sus cambios para auditoría.
-- Modelar promociones con reglas configurables y fechas con zona horaria del negocio. Mantener el dinero en unidades menores enteras (por ejemplo, centavos) o con decimal exacto, no en `Double`.
+- Modelar promociones con reglas configurables y fechas con zona horaria del negocio. Mantener el dinero en unidades menores enteras o con decimal exacto, no en `Double`.
 
 ### Reparto, notificaciones y operación
 
@@ -141,11 +144,13 @@ API / casos de uso (crear pedido, cotizar, reservar stock)
 - Probar precio no numérico y precio negativo; verificar los mensajes de corrección.
 - Solicitar más ingredientes que los disponibles modificando temporalmente el inventario inicial; verificar que no se descuenta parcialmente el stock.
 - Probar un pedido de cuatro pizzas para observar el descuento por cantidad.
-- Revisar la sección de demostración para comprobar combinación, desestructuración, anotación, igualdad y Reflection.
+- Comprobar que la salida indique que el duplicado fue rechazado y que el número de clientes/productos registrados no aumente.
+- Ejecutar `gradle run` y verificar tanto el resumen en la terminal como la creación de `resumen_pedidos.txt` en el directorio de trabajo.
+- Revisar el archivo para comprobar que contiene el resumen, la demostración de la Parte 3 y los resultados de Reflection.
 
 ## Limitaciones y mejoras futuras
 
-Esta entrega no es todavía una app móvil Android: es un programa JVM de consola. No persiste datos entre ejecuciones, no tiene API o base de datos, no envía notificaciones reales, no consulta mapas ni procesa pagos. Como siguiente paso académico, se recomienda separar el dominio en archivos, agregar pruebas unitarias para reglas de precio e inventario y crear una interfaz Android. Para uso comercial, deben revisarse tasas de impuesto, privacidad, requisitos legales y reglas de promoción con responsables del negocio.
+Esta entrega no es todavía una app móvil Android: es un programa JVM de consola. No persiste registros entre ejecuciones, no tiene API o base de datos, no envía notificaciones reales, no consulta mapas ni procesa pagos. Como siguiente paso académico, se recomienda separar el dominio en archivos, agregar pruebas unitarias para registro, precios e inventario y crear una interfaz Android. Para uso comercial, deben revisarse tasas de impuesto, privacidad, requisitos legales y reglas de promoción con responsables del negocio.
 
 ## Autoría
 
