@@ -1,156 +1,132 @@
 # Pizzería Kotlin — Proyecto final
 
-Aplicación de consola educativa que simula funciones centrales de una pizzería: registrar clientes y pedidos, validar datos, verificar inventario, calcular precios y promociones, asignar repartidores y mostrar reportes. El proyecto evolucionó en tres partes, aplicando progresivamente fundamentos y utilidades avanzadas de Kotlin.
+Aplicación de consola educativa que simula funciones centrales de una pizzería: registrar clientes y pedidos, validar datos, verificar inventario, calcular precios y promociones, asignar repartidores y generar un resumen en consola y archivo de texto. El proyecto evolucionó en tres partes aplicando progresivamente fundamentos y utilidades avanzadas de Kotlin.
 
-> **Alcance:** esta entrega es un prototipo ejecutable en la JVM, no una aplicación Android de producción. Clientes, productos, inventario y pedidos se conservan en memoria solo durante la ejecución. El programa genera `resumen_pedidos.txt` en la carpeta desde donde se ejecuta.
+> **Alcance:** prototipo JVM de consola, no aplicación Android de producción. Clientes, productos, inventario y pedidos se conservan en memoria solo durante la ejecución. El programa crea `resumen_pedidos.txt` en la carpeta desde donde se ejecuta.
 
-## Contenido
-
-- [Requisitos](#requisitos)
-- [Estructura](#estructura)
-- [Compilación y ejecución](#compilación-y-ejecución)
-- [Uso del programa](#uso-del-programa)
-- [Evolución de las tres partes](#evolución-de-las-tres-partes)
-- [Reglas de negocio del prototipo](#reglas-de-negocio-del-prototipo)
-- [Arquitectura propuesta para una plataforma real](#arquitectura-propuesta-para-una-plataforma-real)
-- [Pruebas manuales sugeridas](#pruebas-manuales-sugeridas)
-- [Limitaciones y mejoras futuras](#limitaciones-y-mejoras-futuras)
-- [Autoría](#autoría)
-
-## Requisitos
+## Requisitos y ejecución
 
 - JDK 17 o superior.
-- Gradle 8.x instalado para compilar desde terminal.
-- Visual Studio Code con extensiones de Kotlin y Java recomendadas.
-- Conexión a Internet la primera vez que Gradle descargue Kotlin y sus dependencias.
+- Gradle 8.x.
+- Visual Studio Code con extensiones para Kotlin/Java.
 
-> **Nota sobre Gradle:** se utiliza Gradle porque la Parte 3 incluye Kotlin Reflection (`kotlin.reflect.full`), que requiere la dependencia `kotlin-reflect`. Gradle resuelve e incluye esta dependencia automáticamente, evitando configurar manualmente el classpath. No es un requisito explícito de la actividad, sino una manera práctica de ejecutar la funcionalidad de Reflection solicitada.
+Gradle se mantiene porque el requerimiento de la Parte 3 utiliza Kotlin Reflection (`kotlin.reflect.full`) para examinar las clases. La dependencia `kotlin-reflect` se configura en Gradle para resolver el classpath automáticamente; no es un requerimiento independiente de la actividad, sino una forma práctica de ejecutar Reflection.
 
-## Estructura
+Desde la raíz del proyecto:
+
+```bash
+gradle run
+```
+
+Para compilar:
+
+```bash
+gradle build
+```
+
+## Estructura del proyecto
+
+La organización sigue el ejemplo solicitado en clases, usando el paquete raíz `pizzeria` y separando responsabilidades en `anotaciones`, `app`, `modelo` y `util`:
 
 ```text
 .
 ├── build.gradle.kts
 ├── settings.gradle.kts
 ├── README.md
-└── src/
-    └── main/kotlin/
-        └── Main.kt
+└── src/main/kotlin/
+    └── pizzeria/
+        ├── anotaciones/
+        │   └── Promocionable.kt
+        ├── app/
+        │   ├── ArchivoResumen.kt
+        │   ├── Main.kt
+        │   └── Resumen.kt
+        ├── modelo/
+        │   ├── Cliente.kt
+        │   ├── Pedido.kt
+        │   ├── Producto.kt
+        │   ├── ProductoPedido.kt
+        │   ├── Repartidor.kt
+        │   └── Usuario.kt
+        └── util/
+            ├── Dinero.kt
+            ├── Inspector.kt
+            ├── Inventario.kt
+            ├── Promociones.kt
+            ├── Registros.kt
+            └── Validaciones.kt
 ```
 
-El código se mantiene en `Main.kt` para facilitar la revisión de la actividad. En un desarrollo más amplio convendría separar modelos, servicios de negocio, persistencia e interfaz.
-
-## Compilación y ejecución
-
-Desde la carpeta del repositorio:
-
-```bash
-gradle run
-```
-
-Para compilar el proyecto:
-
-```bash
-gradle build
-```
-
-El proyecto declara Kotlin Reflection en Gradle para inspeccionar anotaciones, métodos y propiedades. También se podría compilar con `kotlinc`, pero habría que incluir `kotlin-reflect` manualmente en el classpath; por eso se recomienda Gradle para esta entrega.
+- `pizzeria.anotaciones`: anotaciones personalizadas del dominio.
+- `pizzeria.app`: punto de entrada, presentación y escritura del resumen.
+- `pizzeria.modelo`: entidades y reglas propias del cliente, producto, pedido y repartidor.
+- `pizzeria.util`: validaciones, inventario, registro sin duplicados, promociones, formato monetario e inspección con Reflection.
 
 ## Uso del programa
 
-Al iniciar, la consola solicita:
+El programa solicita nombre y dirección, teléfono internacional, correo, pizza, precio, cantidad (1–100) y notas opcionales. Un correo o teléfono inválido se solicita nuevamente. El teléfono se normaliza al formato `+XX (XXX) XXX-XXXX`.
 
-1. Nombre y dirección del cliente.
-2. Teléfono internacional con formato `+56 (912) 345-6789`.
-3. Correo con formato `nombre@dominio.com`.
-4. Nombre y precio de la pizza.
-5. Cantidad entre 1 y 100 y notas opcionales.
+Clientes y productos se registran en conjuntos (`MutableSet`) utilizando `equals()` y `hashCode()` como claves de negocio. Clientes se identifican por nombre y correo; productos por nombre y categoría. El flujo demuestra que intentos repetidos se rechazan sin incrementar el registro. Como el ejemplo solo captura una alta de cada tipo por ejecución, esa verificación se ejecuta como demostración de la misma función de registro.
 
-El programa registra cliente y producto en conjuntos (`MutableSet`). Si se intenta registrar nuevamente una entidad con la misma clave de negocio, la operación se rechaza: para clientes, nombre y correo; para productos, nombre y categoría. La demostración realiza un intento duplicado explícito para mostrar el resultado sin agregarlo al registro.
-
-Después valida y procesa el pedido, muestra si hay stock y genera el resumen tanto en consola como en `resumen_pedidos.txt`. El archivo se crea o sobrescribe en el directorio de trabajo desde el que se ejecuta `gradle run`.
+El programa valida el stock, calcula importes, muestra el resumen en la terminal y lo guarda en `resumen_pedidos.txt`. El archivo se crea o sobrescribe en el directorio desde donde se ejecuta `gradle run`.
 
 ## Evolución de las tres partes
 
-### Parte 1 — Fundamentos y primera solución
+### Parte 1 — Fundamentos
 
-Se modelaron los datos esenciales de cliente, pizza y pedido con variables y tipos adecuados (`String`, `Int`, `Double`, `val` y `var`). Se incorporó entrada/salida por consola, valores predeterminados ante entradas vacías o incorrectas, cálculo del total y descuento del 10 % al pedir más de tres pizzas. También se agregó una decisión para revisar disponibilidad y actualizar el stock, seguida de un resumen para cliente y pizzería.
+Modelado inicial de cliente, pizza y pedido con tipos apropiados, entrada/salida de consola, valores por defecto, cálculo del total y descuento por cantidad, verificación básica del inventario y resumen del pedido.
 
-### Parte 2 — Utilidades de Kotlin y organización del negocio
+### Parte 2 — Utilidades y organización del negocio
 
-La solución avanzó hacia funciones reutilizables, colecciones y POO. Se añadieron clases para usuarios, clientes, repartidores, productos y pedidos; inventario con mapas; listas de repartidores; selección del más cercano; reportes y filtros de pedidos. Se incluyeron validaciones de correo/teléfono, valores nulos opcionales, manejo de errores numéricos, cálculo de impuestos y una lógica de reabastecimiento descriptiva.
+Funciones reutilizables, colecciones, mapa de inventario, lista de repartidores, asignación por cercanía, manejo de errores y nulos, impuestos, descuentos, clases y herencia para representar usuarios y entidades del negocio.
 
-### Parte 3 — Kotlin avanzado y demostración integrada
+### Parte 3 — Kotlin avanzado
 
-Se agregaron Regex para validar correo y teléfono, rangos para cantidades y fechas promocionales, y `@Promocionable`, consultada mediante Reflection. `Pedido` sobrecarga `+` para combinar pedidos del mismo cliente y recalcular importes. `Producto` y `Cliente` comparan igualdad por claves de negocio y tienen `hashCode()` coherente. Los registros reales en `MutableSet` impiden duplicados. Se implementó desestructuración, se comparan `==` y `===`, y el programa guarda en archivo de texto el mismo resumen integrado que presenta en consola, junto con la demostración y los resultados de Reflection.
+Regex y rangos para validaciones y promociones; anotación `@Promocionable` y Reflection; sobrecarga de `+` para combinar pedidos; desestructuración de cliente y pedido; `equals()`/`hashCode()` y registros sin duplicados; inspección dinámica de propiedades y métodos; y generación del resumen tanto en consola como en `.txt`.
 
-## Reglas de negocio del prototipo
+## Reglas de negocio de ejemplo
 
-- Cada pizza consume una unidad de cada ingrediente de su receta (masa, salsa y queso).
-- El inventario inicial de ejemplo es de 100 unidades por ingrediente. Se descuenta solo si todos los ingredientes están disponibles.
-- El ejemplo usa un impuesto del 19 %, calculado sobre el subtotal después de descuentos. **No es una recomendación tributaria**: la tasa y la base imponible deben confirmarse para el país y el negocio.
-- Se aplica 10 % de descuento al subtotal cuando el pedido contiene más de tres pizzas.
-- Los productos anotados con `@Promocionable` pueden recibir 15 % sobre su propio subtotal entre el 1 de enero y el 31 de diciembre de 2026. Los descuentos se acumulan, con límite máximo igual al subtotal. Para producción, deben definirse reglas de prioridad y acumulación sin ambigüedad.
-- El repartidor se elige de una lista fija en memoria según distancia. No se calcula una ruta ni disponibilidad en tiempo real.
-- La confirmación por correo es solo un mensaje de consola; no se envía un correo real.
-- El pedido combinado es una demostración y no vuelve a reservar inventario ni se agrega al registro de pedidos reales.
-- La unicidad solo se mantiene mientras el programa está en ejecución; no persiste entre ejecuciones.
+- Cada pizza requiere una unidad de masa, salsa y queso; el inventario de inicio es de 100 unidades de cada ingrediente.
+- El stock solo se descuenta si todos los ingredientes están disponibles para la cantidad solicitada.
+- Se usa un impuesto ilustrativo del 19 %, calculado sobre el subtotal después de descuentos; confirmar la regla fiscal aplicable antes de cualquier uso real.
+- Se aplica 10 % por cantidad al pedir más de tres pizzas.
+- Los productos con `@Promocionable` reciben una promoción de ejemplo del 15 % durante 2026. La promoción y el descuento por cantidad se acumulan, con límite total hasta el subtotal.
+- Los repartidores y distancias son datos ilustrativos; no se consulta ubicación real.
+- Las notificaciones son mensajes de consola, no correos enviados.
+- El pedido combinado es una demostración y no vuelve a reservar inventario ni se agrega al registro real de pedidos.
 
-## Arquitectura propuesta para una plataforma real
+## Propuesta para una plataforma real
 
-Este prototipo puede servir como ejercicio de lógica, pero una aplicación móvil requiere separar la interfaz, el dominio y los servicios. Una evolución razonable sería:
+Para convertir el prototipo en una app móvil real, se recomienda:
 
-### Aplicación Android
-
-- Crear un proyecto Android con Kotlin y Gradle; usar Jetpack Compose para pantallas de registro, catálogo, carrito, seguimiento y administración.
-- Usar `ViewModel` y `StateFlow` para el estado de pantalla; las pantallas no deberían calcular precios ni editar inventario directamente.
-- Validar datos también en el servidor. Las validaciones del cliente mejoran la experiencia, pero no son una barrera de seguridad.
-- Configurar navegación, permisos mínimos, accesibilidad, estados de carga/error y pruebas de interfaz.
-
-### Backend y datos
-
-- Exponer una API HTTPS (por ejemplo, REST) para clientes, catálogo, pedidos, inventario y repartidores.
-- Mantener precios, descuentos, impuestos e inventario como autoridad en el servidor; el total enviado por el móvil nunca debe aceptarse sin recalcularlo.
-- Persistir datos en una base relacional como PostgreSQL. Las operaciones de crear pedido y reservar stock deben ejecutarse en una transacción para evitar sobreventa ante pedidos simultáneos.
-- Guardar pedidos con estados definidos —por ejemplo, `RECIBIDO`, `EN_PREPARACION`, `LISTO`, `EN_CAMINO`, `ENTREGADO`, `CANCELADO`— y registrar sus cambios para auditoría.
-- Modelar promociones con reglas configurables y fechas con zona horaria del negocio. Mantener el dinero en unidades menores enteras o con decimal exacto, no en `Double`.
-
-### Reparto, notificaciones y operación
-
-- Asignar repartidores con información de disponibilidad y ubicación, respetando privacidad y permisos; integrar un proveedor de mapas solo si es necesario.
-- Enviar notificaciones mediante un servicio del backend (correo, SMS o Firebase Cloud Messaging), guardando el resultado y reintentando fallos de forma segura.
-- Integrar pagos a través de un proveedor certificado; no almacenar datos de tarjetas en la aplicación.
-- Proteger API y datos con autenticación, autorización por rol, TLS, almacenamiento seguro de secretos, validación de entradas, límites de solicitudes y registros sin datos personales innecesarios.
-- Añadir monitoreo, copias de seguridad, migraciones de base de datos, pruebas automatizadas y despliegues por entornos.
-
-### Separación de responsabilidades sugerida
+1. Crear la aplicación Android en Kotlin, usando Jetpack Compose para interfaz y ViewModel/StateFlow para gestionar el estado de pantalla.
+2. Separar la aplicación móvil de una API HTTPS que sea la autoridad para precios, promociones e inventario.
+3. Persistir clientes, catálogo, pedidos e inventario en una base de datos. Reservar stock y crear el pedido dentro de una transacción para evitar sobreventa en pedidos concurrentes.
+4. Modelar los estados del pedido con un `enum` o estados controlados y registrar cada cambio.
+5. Integrar proveedores reales de correo/notificaciones, pagos y mapas únicamente desde servicios apropiados, protegiendo credenciales y datos personales.
+6. Usar decimal exacto o unidades monetarias menores enteras para importes, y configurar promociones e impuestos según las reglas del negocio y jurisdicción.
+7. Incorporar autenticación, permisos por rol, pruebas automatizadas, monitoreo, copias de seguridad y manejo de errores de red.
 
 ```text
-Android (Compose / ViewModel)
-        │ HTTPS
-        ▼
-API / casos de uso (crear pedido, cotizar, reservar stock)
-        ├── Base de datos
-        ├── Servicio de notificaciones
-        ├── Proveedor de pagos
-        └── Servicio de asignación y seguimiento de reparto
+Android (Compose / ViewModel) --HTTPS--> API / casos de uso
+                                          ├── Base de datos
+                                          ├── Notificaciones
+                                          ├── Pagos
+                                          └── Reparto y seguimiento
 ```
 
-## Pruebas manuales sugeridas
+## Verificación manual
 
-- Ingresar un correo mal formado y comprobar que se solicita de nuevo; luego ingresar uno válido.
-- Probar teléfono válido, mal formado y fin de entrada para verificar formato y valor predeterminado.
-- Probar cantidades `0`, `101` y una válida como `4`.
-- Probar precio no numérico y precio negativo; verificar los mensajes de corrección.
-- Solicitar más ingredientes que los disponibles modificando temporalmente el inventario inicial; verificar que no se descuenta parcialmente el stock.
-- Probar un pedido de cuatro pizzas para observar el descuento por cantidad.
-- Comprobar que la salida indique que el duplicado fue rechazado y que el número de clientes/productos registrados no aumente.
-- Ejecutar `gradle run` y verificar tanto el resumen en la terminal como la creación de `resumen_pedidos.txt` en el directorio de trabajo.
-- Revisar el archivo para comprobar que contiene el resumen, la demostración de la Parte 3 y los resultados de Reflection.
+- Probar correo inválido y después válido; repetir con teléfono.
+- Probar cantidades 0, 101 y 1–100.
+- Ingresar precio no numérico o negativo.
+- Solicitar más stock del disponible y verificar que no se descuente parcialmente.
+- Revisar en la salida que los intentos duplicados se rechacen y los tamaños de los conjuntos sigan en uno.
+- Ejecutar `gradle run`; comprobar el resumen en consola y que `resumen_pedidos.txt` aparezca en la carpeta de ejecución con los resúmenes, demostraciones y resultados de Reflection.
 
-## Limitaciones y mejoras futuras
+## Limitaciones
 
-Esta entrega no es todavía una app móvil Android: es un programa JVM de consola. No persiste registros entre ejecuciones, no tiene API o base de datos, no envía notificaciones reales, no consulta mapas ni procesa pagos. Como siguiente paso académico, se recomienda separar el dominio en archivos, agregar pruebas unitarias para registro, precios e inventario y crear una interfaz Android. Para uso comercial, deben revisarse tasas de impuesto, privacidad, requisitos legales y reglas de promoción con responsables del negocio.
+La solución no conserva datos entre ejecuciones y no incluye interfaz Android, API, base de datos, notificaciones reales, pagos ni ubicación. Es un prototipo didáctico para ejecutar en consola y mostrar los conceptos solicitados.
 
 ## Autoría
 

@@ -16,5 +16,5 @@ kotlin {
 }
 
 application {
-    mainClass.set("MainKt")
+    mainClass.set("pizzeria.app.MainKt")
 }
