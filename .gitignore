@@ -1,0 +1,7 @@
+.gradle/
+build/
+.kotlin/
+*.jar
+*.class
+.idea/
+.vscode/

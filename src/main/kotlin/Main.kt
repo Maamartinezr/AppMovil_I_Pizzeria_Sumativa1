@@ -1,12 +1,16 @@
 import java.time.LocalDate
 import java.util.Locale
+import kotlin.reflect.KClass
 import kotlin.reflect.full.declaredMemberFunctions
+import kotlin.reflect.full.findAnnotation
 import kotlin.reflect.full.memberProperties
 
 private const val TASA_IMPUESTO = 0.19
 private const val DESCUENTO_MAYORISTA = 0.10
 private const val DESCUENTO_PROMOCION = 0.15
 private const val TELEFONO_PREDETERMINADO = "+00 (000) 000-0000"
+private const val CORREO_PREDETERMINADO = "correo@invalido.com"
+private val RANGO_PROMOCIONAL = LocalDate.of(2026, 1, 1)..LocalDate.of(2026, 12, 31)
 private val CORREO_REGEX = Regex("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")
 private val TELEFONO_REGEX = Regex("^\\+?([0-9]{1,3})[ .-]?\\(?([0-9]{3})\\)?[ .-]?([0-9]{3})[ .-]?([0-9]{4})$")
 
@@ -14,7 +18,10 @@ private val TELEFONO_REGEX = Regex("^\\+?([0-9]{1,3})[ .-]?\\(?([0-9]{3})\\)?[ .
 @Retention(AnnotationRetention.RUNTIME)
 annotation class Promocionable(val descripcion: String = "Promoción especial")
 
-open class Usuario(val nombre: String, val contacto: String)
+open class Usuario(
+    val nombre: String,
+    val contacto: String
+)
 
 class Cliente(
     nombre: String,
@@ -22,16 +29,20 @@ class Cliente(
     telefono: String,
     val correo: String
 ) : Usuario(nombre, telefono) {
-    val telefono: String get() = contacto
+    val telefono: String
+        get() = contacto
 
-    operator fun component1() = nombre
-    operator fun component2() = correo
-    operator fun component3() = telefono
+    operator fun component1(): String = nombre
+    operator fun component2(): String = correo
+    operator fun component3(): String = telefono
 
     override fun equals(other: Any?): Boolean =
-        this === other || (other is Cliente && nombre.equals(other.nombre, ignoreCase = true) && correo.equals(other.correo, ignoreCase = true))
+        this === other || (other is Cliente &&
+            nombre.equals(other.nombre, ignoreCase = true) &&
+            correo.equals(other.correo, ignoreCase = true))
 
-    override fun hashCode(): Int = 31 * nombre.lowercase().hashCode() + correo.lowercase().hashCode()
+    override fun hashCode(): Int =
+        31 * nombre.lowercase(Locale.ROOT).hashCode() + correo.lowercase(Locale.ROOT).hashCode()
 }
 
 class Repartidor(
@@ -54,15 +65,32 @@ class Producto(
     val ingredientes: List<String>,
     val categoria: String = "pizza"
 ) {
-    fun detallarProducto(): String = "$nombre - $${dinero(precio)} (${ingredientes.joinToString()})"
+    init {
+        require(nombre.isNotBlank()) { "El nombre del producto no puede estar vacío." }
+        require(precio >= 0.0) { "El precio no puede ser negativo." }
+        require(categoria.isNotBlank()) { "La categoría no puede estar vacía." }
+    }
+
+    fun detallarProducto(): String =
+        "$nombre - $${dinero(precio)} (${ingredientes.joinToString()})"
 
     override fun equals(other: Any?): Boolean =
-        this === other || (other is Producto && nombre.equals(other.nombre, ignoreCase = true) && categoria.equals(other.categoria, ignoreCase = true))
+        this === other || (other is Producto &&
+            nombre.equals(other.nombre, ignoreCase = true) &&
+            categoria.equals(other.categoria, ignoreCase = true))
 
-    override fun hashCode(): Int = 31 * nombre.lowercase().hashCode() + categoria.lowercase().hashCode()
+    override fun hashCode(): Int =
+        31 * nombre.lowercase(Locale.ROOT).hashCode() + categoria.lowercase(Locale.ROOT).hashCode()
 }
 
-data class ProductoPedido(val producto: Producto, val cantidad: Int)
+data class ProductoPedido(
+    val producto: Producto,
+    val cantidad: Int
+) {
+    init {
+        require(cantidad in 1..100) { "La cantidad debe estar entre 1 y 100." }
+    }
+}
 
 class Pedido(
     val idPedido: Int,
@@ -73,47 +101,74 @@ class Pedido(
     var repartidor: Repartidor? = null,
     val fecha: LocalDate = LocalDate.now()
 ) {
-    val cantidadPizzas: Int get() = productos.sumOf { it.cantidad }
+    init {
+        require(idPedido > 0) { "El identificador del pedido debe ser positivo." }
+        require(productos.isNotEmpty()) { "El pedido debe contener al menos un producto." }
+    }
+
+    val cantidadPizzas: Int
+        get() = productos.sumOf { it.cantidad }
+
     fun calcularSubtotal(): Double = productos.sumOf { it.producto.precio * it.cantidad }
-    fun calcularImpuestos(): Double = calcularSubtotal() * TASA_IMPUESTO
+
+    /** Impuestos de ejemplo; se calculan sobre el subtotal después de descuentos. */
+    fun calcularImpuestos(): Double = (calcularSubtotal() - calcularDescuento()) * TASA_IMPUESTO
+
     fun productoEsPromocionable(producto: Producto): Boolean =
-        producto::class.annotations.any { it is Promocionable }
+        producto::class.findAnnotation<Promocionable>() != null
 
     fun calcularDescuento(): Double {
         val subtotal = calcularSubtotal()
-        val descuentoCantidad = if (cantidadPizzas > 3) subtotal * DESCUENTO_MAYORISTA else 0.0
-        val dentroDePromocion = fecha in LocalDate.of(2026, 1, 1)..LocalDate.of(2026, 12, 31)
-        val descuentoAnotado = if (dentroDePromocion && productos.any { productoEsPromocionable(it.producto) }) {
-            subtotal * DESCUENTO_PROMOCION
-        } else 0.0
-        // Evita acumular descuentos por encima del subtotal.
-        return (descuentoCantidad + descuentoAnotado).coerceAtMost(subtotal)
+        val descuentoPorCantidad =
+            if (cantidadPizzas > 3) subtotal * DESCUENTO_MAYORISTA else 0.0
+        val dentroDelPeriodo = fecha in RANGO_PROMOCIONAL
+        val subtotalPromocionable = productos
+            .filter { productoEsPromocionable(it.producto) }
+            .sumOf { it.producto.precio * it.cantidad }
+        val descuentoPromocional =
+            if (dentroDelPeriodo) subtotalPromocionable * DESCUENTO_PROMOCION else 0.0
+
+        // Para este ejercicio los descuentos son acumulables, con tope del subtotal.
+        return (descuentoPorCantidad + descuentoPromocional).coerceAtMost(subtotal)
     }
 
     fun calcularTotal(): Double = calcularSubtotal() + calcularImpuestos() - calcularDescuento()
-    fun cambiarEstado(nuevoEstado: String) { estado = nuevoEstado }
 
-    operator fun component1() = cliente
-    operator fun component2() = productos
-    operator fun component3() = calcularTotal()
+    fun cambiarEstado(nuevoEstado: String) {
+        estado = nuevoEstado
+    }
+
+    operator fun component1(): Cliente = cliente
+    operator fun component2(): List<ProductoPedido> = productos
+    operator fun component3(): Double = calcularTotal()
 
     operator fun plus(otro: Pedido): Pedido {
-        require(cliente == otro.cliente) { "Solo se pueden combinar pedidos del mismo cliente." }
+        require(cliente == otro.cliente) {
+            "Solo se pueden combinar pedidos del mismo cliente."
+        }
         val productosCombinados = (productos + otro.productos)
             .groupBy { it.producto }
-            .map { (_, lineas) -> ProductoPedido(lineas.first().producto, lineas.sumOf { it.cantidad }) }
+            .map { (_, lineas) ->
+                ProductoPedido(
+                    producto = lineas.first().producto,
+                    cantidad = lineas.sumOf { it.cantidad }
+                )
+            }
         return Pedido(
-            idPedido = minOf(idPedido, otro.idPedido),
+            idPedido = maxOf(idPedido, otro.idPedido) + 1,
             cliente = cliente,
             productos = productosCombinados,
             estado = "En preparación",
-            notas = listOfNotNull(notas, otro.notas).takeIf { it.isNotEmpty() }?.joinToString("; "),
+            notas = listOfNotNull(notas, otro.notas)
+                .takeIf { it.isNotEmpty() }
+                ?.joinToString("; "),
             fecha = maxOf(fecha, otro.fecha)
         )
     }
 }
 
-private fun dinero(valor: Double): String = String.format(Locale("es", "CL"), "%,.0f", valor)
+private fun dinero(valor: Double): String =
+    String.format(Locale("es", "CL"), "%,.0f", valor)
 
 private fun leerTexto(mensaje: String, predeterminado: String): String {
     print(mensaje)
@@ -123,26 +178,25 @@ private fun leerTexto(mensaje: String, predeterminado: String): String {
 private fun leerCorreo(): String {
     while (true) {
         print("Correo electrónico: ")
-        val correo = readLine()?.trim().orEmpty()
+        val correo = readLine()?.trim() ?: return CORREO_PREDETERMINADO
         if (correo.matches(CORREO_REGEX)) return correo
         println("Formato inválido. Ingresa un correo válido, por ejemplo nombre@dominio.com.")
     }
 }
 
+/** Convierte números de formato internacional a +XX (XXX) XXX-XXXX. */
 private fun formatearTelefono(entrada: String): String {
-    val digitos = entrada.filter(Char::isDigit)
-    if (digitos.length == 10) return "+00 (${digitos.substring(0, 3)}) ${digitos.substring(3, 6)}-${digitos.substring(6)}"
-    val coincidencia = TELEFONO_REGEX.matchEntire(entrada) ?: return TELEFONO_PREDETERMINADO
-    val (codigo, area, prefijo, linea) = coincidencia.destructured
-    return "+$codigo ($area) $prefijo-$linea"
+    val coincidencia = TELEFONO_REGEX.matchEntire(entrada.trim()) ?: return TELEFONO_PREDETERMINADO
+    val (codigoPais, area, prefijo, linea) = coincidencia.destructured
+    return "+$codigoPais ($area) $prefijo-$linea"
 }
 
 private fun leerTelefono(): String {
     while (true) {
-        print("Teléfono con código de país (ejemplo: +56 912 345 678): ")
-        val entrada = readLine()?.trim().orEmpty()
-        val formateado = formatearTelefono(entrada)
-        if (formateado != TELEFONO_PREDETERMINADO) return formateado
+        print("Teléfono (ejemplo: +56 (912) 345-6789): ")
+        val entrada = readLine() ?: return TELEFONO_PREDETERMINADO
+        val telefono = formatearTelefono(entrada)
+        if (telefono != TELEFONO_PREDETERMINADO) return telefono
         println("Teléfono inválido. Reingrésalo en formato +XX (XXX) XXX-XXXX.")
     }
 }
@@ -164,7 +218,7 @@ private fun leerPrecio(): Double {
             val precio = entrada.trim().replace(',', '.').toDouble()
             require(precio >= 0.0) { "El precio no puede ser negativo." }
             return precio
-        } catch (error: NumberFormatException) {
+        } catch (_: NumberFormatException) {
             println("Costo inválido. Ingresa un número, por ejemplo 8500.")
         } catch (error: IllegalArgumentException) {
             println("Costo no válido: ${error.message}")
@@ -172,33 +226,60 @@ private fun leerPrecio(): Double {
     }
 }
 
-private fun prepararLote(ingredientes: List<String>, cantidadPizzas: Int, inventario: MutableMap<String, Int>): Map<String, Int> {
+/** Descuenta ingredientes únicamente si existe stock suficiente para todos. */
+private fun prepararLote(
+    ingredientes: List<String>,
+    cantidadPizzas: Int,
+    inventario: MutableMap<String, Int>
+): Map<String, Int> {
     require(cantidadPizzas in 1..100) { "La cantidad debe estar entre 1 y 100." }
     val necesarios = ingredientes.distinct().associateWith { cantidadPizzas }
     val faltantes = necesarios.mapNotNull { (ingrediente, requerido) ->
         val falta = requerido - (inventario[ingrediente] ?: 0)
         if (falta > 0) ingrediente to falta else null
     }.toMap()
-    if (faltantes.isEmpty()) necesarios.forEach { (ingrediente, cantidad) -> inventario[ingrediente] = inventario.getValue(ingrediente) - cantidad }
+
+    if (faltantes.isEmpty()) {
+        necesarios.forEach { (ingrediente, cantidad) ->
+            inventario[ingrediente] = inventario.getValue(ingrediente) - cantidad
+        }
+    }
     return faltantes
 }
 
-private fun imprimirReflection(tipo: kotlin.reflect.KClass<*>) {
+private fun mensajeDisponibilidad(faltantes: Map<String, Int>): String = when {
+    faltantes.isEmpty() -> "Stock suficiente: pedido aceptado e inventario actualizado."
+    else -> buildString {
+        appendLine("No se puede aceptar el pedido; faltan los siguientes ingredientes:")
+        faltantes.forEach { (ingrediente, cantidad) ->
+            appendLine("- $ingrediente: faltan $cantidad unidad(es).")
+        }
+        append("Registrar la compra, reponer el inventario y verificarlo nuevamente.")
+    }
+}
+
+private fun imprimirReflection(tipo: KClass<*>) {
     println("\nReflection de ${tipo.simpleName}:")
     println("Propiedades: ${tipo.memberProperties.joinToString { it.name }.ifBlank { "ninguna" }}")
     println("Métodos: ${tipo.declaredMemberFunctions.joinToString { it.name }.ifBlank { "ninguno" }}")
 }
 
-private fun imprimirResumen(pedido: Pedido) {
-    println("\n================ RESUMEN DEL PEDIDO ================")
-    println("Pedido #${pedido.idPedido} | Fecha: ${pedido.fecha} | Cliente: ${pedido.cliente.nombre}")
+private fun imprimirResumen(pedido: Pedido, titulo: String = "RESUMEN DEL PEDIDO") {
+    println("\n================ $titulo ================")
+    println("Pedido #${pedido.idPedido} | Fecha: ${pedido.fecha}")
+    println("Cliente: ${pedido.cliente.nombre} | Dirección: ${pedido.cliente.direccion}")
     println("Contacto: ${pedido.cliente.telefono} | ${pedido.cliente.correo}")
-    pedido.productos.forEach { println("${it.cantidad} x ${it.producto.detallarProducto()} = $${dinero(it.producto.precio * it.cantidad)}") }
-    println("Subtotal: $${dinero(pedido.calcularSubtotal())} | Impuestos: $${dinero(pedido.calcularImpuestos())}")
-    println("Descuentos: $${dinero(pedido.calcularDescuento())} | Total: $${dinero(pedido.calcularTotal())}")
+    pedido.productos.forEach { linea ->
+        val totalLinea = linea.producto.precio * linea.cantidad
+        println("${linea.cantidad} x ${linea.producto.detallarProducto()} = $${dinero(totalLinea)}")
+    }
+    println("Subtotal: $${dinero(pedido.calcularSubtotal())}")
+    println("Impuestos (${(TASA_IMPUESTO * 100).toInt()}%): $${dinero(pedido.calcularImpuestos())}")
+    println("Descuentos: $${dinero(pedido.calcularDescuento())}")
+    println("Total final: $${dinero(pedido.calcularTotal())}")
     println("Estado: ${pedido.estado} | Repartidor: ${pedido.repartidor?.nombre ?: "Por asignar"}")
     println("Notas: ${pedido.notas?.takeIf(String::isNotBlank) ?: "Sin notas"}")
-    println("=====================================================")
+    println("=".repeat(48))
 }
 
 fun main() {
@@ -216,46 +297,62 @@ fun main() {
     val notas = readLine()?.trim()?.takeIf(String::isNotEmpty)
 
     val inventario = mutableMapOf("masa" to 100, "salsa" to 100, "queso" to 100)
-    val pedidos = mutableListOf<Pedido>()
-    val pedido = Pedido(1, cliente, listOf(ProductoPedido(producto, cantidad)), notas = notas)
+    val pedido = Pedido(
+        idPedido = 1,
+        cliente = cliente,
+        productos = listOf(ProductoPedido(producto, cantidad)),
+        notas = notas
+    )
     val faltantes = prepararLote(producto.ingredientes, cantidad, inventario)
+    println(mensajeDisponibilidad(faltantes))
+
     if (faltantes.isEmpty()) {
-        pedido.repartidor = listOf(
+        val repartidoresDisponibles = listOf(
             Repartidor("Camila", "+56 (911) 111-1111", 2.4),
             Repartidor("Diego", "+56 (922) 222-2222", 1.2)
-        ).sortedBy { it.distanciaKm }.find { it.disponible }
-        println("Pedido confirmado. Stock actualizado.")
-        pedido.cliente.correo.let { println("Notificación enviada a $it") }
+        )
+        pedido.repartidor = repartidoresDisponibles
+            .sortedBy { it.distanciaKm }
+            .find { it.disponible }
+        pedido.cliente.correo.let { println("Notificación de confirmación enviada a $it.") }
     } else {
         pedido.cambiarEstado("Pendiente por falta de ingredientes")
-        println("Stock insuficiente: ${faltantes.entries.joinToString { "${it.key}: faltan ${it.value}" }}. Reponer ingredientes y volver a procesar el pedido.")
     }
-    pedidos.add(pedido)
 
-    // Demostración de igualdad, registros sin duplicados y combinación de pedidos.
+    // La colección se mantiene en memoria solo durante esta demostración.
+    val pedidosDelDia = mutableListOf(pedido)
+
+    // Demostración de igualdad, deduplicación, sobrecarga y desestructuración.
     val clientesRegistrados = mutableSetOf(cliente)
     clientesRegistrados.add(Cliente(cliente.nombre, cliente.direccion, cliente.telefono, cliente.correo))
     val productosRegistrados = mutableSetOf(producto)
     productosRegistrados.add(Producto(producto.nombre, producto.precio, producto.ingredientes, producto.categoria))
-    val segundoPedido = Pedido(2, cliente, listOf(ProductoPedido(producto, 1)), notas = "Pedido combinado")
-    val combinado = pedido + segundoPedido
 
+    val segundoPedido = Pedido(
+        idPedido = 2,
+        cliente = cliente,
+        productos = listOf(ProductoPedido(producto, 1)),
+        notas = "Pedido de demostración"
+    )
+    val combinado = pedido + segundoPedido
     val (nombreCliente, correoCliente, telefonoCliente) = cliente
     val (clientePedido, productosPedido, totalPedido) = combinado
+
     println("\n================ DEMOSTRACIÓN PARTE 3 ================")
     println("Cliente desestructurado: $nombreCliente | $correoCliente | $telefonoCliente")
     println("Pedido desestructurado: ${clientePedido.nombre} | ${productosPedido.size} línea(s) | Total combinado: $${dinero(totalPedido)}")
     println("Pedidos combinados: #${pedido.idPedido} + #${segundoPedido.idPedido} = #${combinado.idPedido}")
-    println("Producto promocionable: ${producto::class.annotations.filterIsInstance<Promocionable>().joinToString { it.descripcion }.ifBlank { "No" }}")
+    val promocion = producto::class.findAnnotation<Promocionable>()?.descripcion ?: "No promocionable"
+    println("Producto promocionable: $promocion")
     println("Clientes únicos: ${clientesRegistrados.size} | Productos únicos: ${productosRegistrados.size}")
-    println("Igualdad: cliente duplicado=${cliente == Cliente(cliente.nombre, cliente.direccion, cliente.telefono, cliente.correo)}, producto duplicado=${producto == Producto(producto.nombre, 0.0, emptyList(), producto.categoria)}")
-    println("Rango promocional: ${pedido.fecha in LocalDate.of(2026, 1, 1)..LocalDate.of(2026, 12, 31)}")
+    println("Igualdad: cliente duplicado=${cliente == clientesRegistrados.last()}, producto duplicado=${producto == productosRegistrados.last()}")
+    println("Fecha dentro de promoción: ${pedido.fecha in RANGO_PROMOCIONAL}")
     println("=======================================================")
 
     imprimirResumen(pedido)
-    imprimirResumen(combinado)
+    imprimirResumen(combinado, "RESUMEN DEL PEDIDO COMBINADO")
     imprimirReflection(Pedido::class)
     imprimirReflection(Producto::class)
     imprimirReflection(Cliente::class)
-    println("\nPedidos registrados en esta ejecución: ${pedidos.size}")
+    println("\nPedidos de la ejecución: ${pedidosDelDia.size}")
 }
