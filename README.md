@@ -15,6 +15,7 @@ Aplicación de consola educativa que simula funciones centrales de una pizzería
 - [Arquitectura propuesta para una plataforma real](#arquitectura-propuesta-para-una-plataforma-real)
 - [Pruebas manuales sugeridas](#pruebas-manuales-sugeridas)
 - [Limitaciones y mejoras futuras](#limitaciones-y-mejoras-futuras)
+- [Autoría](#autoría)
 
 ## Requisitos
 
@@ -23,7 +24,7 @@ Aplicación de consola educativa que simula funciones centrales de una pizzería
 - Visual Studio Code con extensiones de Kotlin y Java recomendadas.
 - Conexión a Internet la primera vez que Gradle descargue Kotlin y sus dependencias.
 
-> Nota importante sobre Gradle: se utiliza Gradle porque la Parte 3 incluye Kotlin Reflection (`kotlin.reflect.full`), la cual requiere la dependencia `kotlin-reflect`. Al compilar con Gradle, esa dependencia se resuelve automáticamente y evita errores de classpath. En otras palabras, Gradle no es un requisito arbitrario del profesor, sino una solución práctica para que el proyecto funcione correctamente con la funcionalidad avanzada solicitada.
+> **Nota sobre Gradle:** se utiliza Gradle porque la Parte 3 incluye Kotlin Reflection (`kotlin.reflect.full`), que requiere la dependencia `kotlin-reflect`. Gradle resuelve e incluye esta dependencia automáticamente, evitando configurar manualmente el classpath. No es un requisito explícito de la actividad, sino una manera práctica de ejecutar la funcionalidad de Reflection solicitada.
 
 ## Estructura
 
@@ -47,13 +48,13 @@ Desde la carpeta del repositorio:
 gradle run
 ```
 
-Para compilar un artefacto ejecutable:
+Para compilar el proyecto:
 
 ```bash
 gradle build
 ```
 
-El proyecto usa Gradle para declarar explícitamente Kotlin Reflection, necesaria para inspeccionar anotaciones, métodos y propiedades. También se puede compilar con `kotlinc`, pero hay que incluir `kotlin-reflect` en el classpath; por eso se recomienda Gradle.
+El proyecto declara Kotlin Reflection en Gradle para inspeccionar anotaciones, métodos y propiedades. También se podría compilar con `kotlinc`, pero habría que incluir `kotlin-reflect` manualmente en el classpath; por eso se recomienda Gradle para esta entrega.
 
 ## Uso del programa
 
@@ -145,3 +146,8 @@ API / casos de uso (crear pedido, cotizar, reservar stock)
 ## Limitaciones y mejoras futuras
 
 Esta entrega no es todavía una app móvil Android: es un programa JVM de consola. No persiste datos entre ejecuciones, no tiene API o base de datos, no envía notificaciones reales, no consulta mapas ni procesa pagos. Como siguiente paso académico, se recomienda separar el dominio en archivos, agregar pruebas unitarias para reglas de precio e inventario y crear una interfaz Android. Para uso comercial, deben revisarse tasas de impuesto, privacidad, requisitos legales y reglas de promoción con responsables del negocio.
+
+## Autoría
+
+**María Alejandra Martínez Reverol**  
+Proyecto desarrollado para la asignatura **Aplicaciones Móviles I**.
