@@ -23,6 +23,8 @@ Aplicación de consola educativa que simula funciones centrales de una pizzería
 - Visual Studio Code con extensiones de Kotlin y Java recomendadas.
 - Conexión a Internet la primera vez que Gradle descargue Kotlin y sus dependencias.
 
+> Nota importante sobre Gradle: se utiliza Gradle porque la Parte 3 incluye Kotlin Reflection (`kotlin.reflect.full`), la cual requiere la dependencia `kotlin-reflect`. Al compilar con Gradle, esa dependencia se resuelve automáticamente y evita errores de classpath. En otras palabras, Gradle no es un requisito arbitrario del profesor, sino una solución práctica para que el proyecto funcione correctamente con la funcionalidad avanzada solicitada.
+
 ## Estructura
 
 ```text
