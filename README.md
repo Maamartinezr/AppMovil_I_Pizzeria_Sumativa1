@@ -26,103 +26,44 @@ gradle build
 
 ## Estructura del proyecto
 
-La organización sigue el ejemplo solicitado en clases, usando el paquete raíz `pizzeria` y separando responsabilidades en `anotaciones`, `app`, `modelo` y `util`:
-
-```text
-.
-├── build.gradle.kts
-├── settings.gradle.kts
-├── README.md
-└── src/main/kotlin/
-    └── pizzeria/
-        ├── anotaciones/
-        │   └── Promocionable.kt
-        ├── app/
-        │   ├── ArchivoResumen.kt
-        │   ├── Main.kt
-        │   └── Resumen.kt
-        ├── modelo/
-        │   ├── Cliente.kt
-        │   ├── Pedido.kt
-        │   ├── Producto.kt
-        │   ├── ProductoPedido.kt
-        │   ├── Repartidor.kt
-        │   └── Usuario.kt
-        └── util/
-            ├── Dinero.kt
-            ├── Inspector.kt
-            ├── Inventario.kt
-            ├── Promociones.kt
-            ├── Registros.kt
-            └── Validaciones.kt
-```
-
-- `pizzeria.anotaciones`: anotaciones personalizadas del dominio.
-- `pizzeria.app`: punto de entrada, presentación y escritura del resumen.
-- `pizzeria.modelo`: entidades y reglas propias del cliente, producto, pedido y repartidor.
-- `pizzeria.util`: validaciones, inventario, registro sin duplicados, promociones, formato monetario e inspección con Reflection.
+La organización sigue el ejemplo solicitado en clases, usando el paquete raíz `pizzeria` y separando responsabilidades en `anotaciones`, `app`, `modelo` y `util`.
 
 ## Uso del programa
 
-El programa solicita nombre y dirección, teléfono internacional, correo, pizza, precio, cantidad (1–100) y notas opcionales. Un correo o teléfono inválido se solicita nuevamente. El teléfono se normaliza al formato `+XX (XXX) XXX-XXXX`.
+El programa solicita nombre y dirección, teléfono internacional, correo, pizza, precio, cantidad de pizzas (1–100), fecha del pedido y notas opcionales. Un correo, teléfono o fecha inválidos se solicitan nuevamente. La fecha debe ingresarse en formato ISO `AAAA-MM-DD` y corresponder a una fecha real (por ejemplo, `2026-06-15`). Si la fecha es válida pero está fuera del periodo promocional, el pedido puede continuar, pero no se aplica el descuento de promoción.
 
-Clientes y productos se registran en conjuntos (`MutableSet`) utilizando `equals()` y `hashCode()` como claves de negocio. Clientes se identifican por nombre y correo; productos por nombre y categoría. El flujo demuestra que intentos repetidos se rechazan sin incrementar el registro. Como el ejemplo solo captura una alta de cada tipo por ejecución, esa verificación se ejecuta como demostración de la misma función de registro.
+Clientes y productos se registran en conjuntos (`MutableSet`) utilizando `equals()` y `hashCode()` como claves de negocio. Clientes se identifican por nombre y correo; productos por nombre y categoría. Los intentos repetidos se rechazan.
 
-El programa valida el stock, calcula importes, muestra el resumen en la terminal y lo guarda en `resumen_pedidos.txt`. El archivo se crea o sobrescribe en el directorio desde donde se ejecuta `gradle run`.
+El programa valida el stock, calcula importes, muestra el resumen en la terminal y lo guarda en `resumen_pedidos.txt`.
 
-## Evolución de las tres partes
+## Validaciones de entrada y rangos
 
-### Parte 1 — Fundamentos
-
-Modelado inicial de cliente, pizza y pedido con tipos apropiados, entrada/salida de consola, valores por defecto, cálculo del total y descuento por cantidad, verificación básica del inventario y resumen del pedido.
-
-### Parte 2 — Utilidades y organización del negocio
-
-Funciones reutilizables, colecciones, mapa de inventario, lista de repartidores, asignación por cercanía, manejo de errores y nulos, impuestos, descuentos, clases y herencia para representar usuarios y entidades del negocio.
-
-### Parte 3 — Kotlin avanzado
-
-Regex y rangos para validaciones y promociones; anotación `@Promocionable` y Reflection; sobrecarga de `+` para combinar pedidos; desestructuración de cliente y pedido; `equals()`/`hashCode()` y registros sin duplicados; inspección dinámica de propiedades y métodos; y generación del resumen tanto en consola como en `.txt`.
+- Correo electrónico: Regex; vuelve a solicitarse hasta recibir un formato válido.
+- Teléfono: Regex y normalización al formato `+XX (XXX) XXX-XXXX`; vuelve a solicitarse ante errores.
+- Fecha: analiza `AAAA-MM-DD` como `LocalDate`; rechaza formatos inválidos y fechas inexistentes, indicando cómo corregirlas.
+- Cantidad de pizzas: solo acepta enteros incluidos en el rango `1..100`; muestra un mensaje claro y vuelve a pedir el dato en caso de error.
+- Fecha promocional: el rango inclusivo se define en `RANGO_PROMOCIONAL`; fuera de él el pedido continúa sin el descuento promocional.
 
 ## Reglas de negocio de ejemplo
 
-- Cada pizza requiere una unidad de masa, salsa y queso; el inventario de inicio es de 100 unidades de cada ingrediente.
+- Cada pizza requiere una unidad de masa, salsa y queso; el inventario inicial es de 100 unidades de cada ingrediente.
 - El stock solo se descuenta si todos los ingredientes están disponibles para la cantidad solicitada.
 - Se usa un impuesto ilustrativo del 19 %, calculado sobre el subtotal después de descuentos; confirmar la regla fiscal aplicable antes de cualquier uso real.
 - Se aplica 10 % por cantidad al pedir más de tres pizzas.
 - Los productos con `@Promocionable` reciben una promoción de ejemplo del 15 % durante 2026. La promoción y el descuento por cantidad se acumulan, con límite total hasta el subtotal.
 - Los repartidores y distancias son datos ilustrativos; no se consulta ubicación real.
 - Las notificaciones son mensajes de consola, no correos enviados.
-- El pedido combinado es una demostración y no vuelve a reservar inventario ni se agrega al registro real de pedidos.
+
+## Verificación manual de fechas y cantidades
+
+- Introducir cantidad `0`, `101` o texto; el programa debe mostrar error y volver a solicitarla. Probar también `1` y `100` como límites válidos.
+- Introducir una fecha con formato incorrecto, como `15/06/2026`, o una fecha inexistente, como `2026-02-30`; debe mostrar error y volver a solicitarla.
+- Introducir `2026-06-15`; debe aceptarse y estar dentro del rango promocional configurado.
+- Introducir una fecha real fuera de 2026, como `2027-01-10`; debe aceptarse con aviso y no aplicar el descuento promocional.
 
 ## Propuesta para una plataforma real
 
-Para convertir el prototipo en una app móvil real, se recomienda:
-
-1. Crear la aplicación Android en Kotlin, usando Jetpack Compose para interfaz y ViewModel/StateFlow para gestionar el estado de pantalla.
-2. Separar la aplicación móvil de una API HTTPS que sea la autoridad para precios, promociones e inventario.
-3. Persistir clientes, catálogo, pedidos e inventario en una base de datos. Reservar stock y crear el pedido dentro de una transacción para evitar sobreventa en pedidos concurrentes.
-4. Modelar los estados del pedido con un `enum` o estados controlados y registrar cada cambio.
-5. Integrar proveedores reales de correo/notificaciones, pagos y mapas únicamente desde servicios apropiados, protegiendo credenciales y datos personales.
-6. Usar decimal exacto o unidades monetarias menores enteras para importes, y configurar promociones e impuestos según las reglas del negocio y jurisdicción.
-7. Incorporar autenticación, permisos por rol, pruebas automatizadas, monitoreo, copias de seguridad y manejo de errores de red.
-
-```text
-Android (Compose / ViewModel) --HTTPS--> API / casos de uso
-                                          ├── Base de datos
-                                          ├── Notificaciones
-                                          ├── Pagos
-                                          └── Reparto y seguimiento
-```
-
-## Verificación manual
-
-- Probar correo inválido y después válido; repetir con teléfono.
-- Probar cantidades 0, 101 y 1–100.
-- Ingresar precio no numérico o negativo.
-- Solicitar más stock del disponible y verificar que no se descuente parcialmente.
-- Revisar en la salida que los intentos duplicados se rechacen y los tamaños de los conjuntos sigan en uno.
-- Ejecutar `gradle run`; comprobar el resumen en consola y que `resumen_pedidos.txt` aparezca en la carpeta de ejecución con los resúmenes, demostraciones y resultados de Reflection.
+Para convertir el prototipo en una app móvil real, se recomienda usar Android con Kotlin y Jetpack Compose, separar UI de lógica mediante ViewModel/StateFlow, delegar precios/promociones/inventario a una API HTTPS, persistir datos con transacciones en una base de datos, usar estados controlados de pedido, integrar notificaciones/pagos/mapas de proveedores adecuados y agregar seguridad, pruebas y monitoreo.
 
 ## Limitaciones
 

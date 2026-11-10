@@ -1,6 +1,5 @@
 package pizzeria.app
 
-import java.time.LocalDate
 import pizzeria.anotaciones.Promocionable
 import pizzeria.modelo.Cliente
 import pizzeria.modelo.Pedido
@@ -12,6 +11,7 @@ import pizzeria.util.dinero
 import pizzeria.util.inspeccionarClase
 import pizzeria.util.leerCantidad
 import pizzeria.util.leerCorreo
+import pizzeria.util.leerFechaPedido
 import pizzeria.util.leerPrecio
 import pizzeria.util.leerTelefono
 import pizzeria.util.leerTexto
@@ -41,11 +41,23 @@ fun main() {
     check(registrarProducto(producto, productosRegistrados))
 
     val cantidad = leerCantidad()
+    val fechaPedido = leerFechaPedido()
+    val dentroDelPeriodoPromocional = fechaPedido in RANGO_PROMOCIONAL
+    if (!dentroDelPeriodoPromocional) {
+        println("La fecha es válida, pero está fuera del periodo promocional (${RANGO_PROMOCIONAL.start} a ${RANGO_PROMOCIONAL.endInclusive}); no se aplicará ese descuento.")
+    }
+
     print("Notas del pedido (opcional): ")
     val notas = readLine()?.trim()?.takeIf(String::isNotEmpty)
 
     val inventario = mutableMapOf("masa" to 100, "salsa" to 100, "queso" to 100)
-    val pedido = Pedido(1, cliente, listOf(ProductoPedido(producto, cantidad)), notas = notas)
+    val pedido = Pedido(
+        idPedido = 1,
+        cliente = cliente,
+        productos = listOf(ProductoPedido(producto, cantidad)),
+        notas = notas,
+        fecha = fechaPedido
+    )
     val faltantes = prepararLote(producto.ingredientes, cantidad, inventario)
     val resultadoStock = mensajeDisponibilidad(faltantes)
     println(resultadoStock)
@@ -74,7 +86,7 @@ fun main() {
         cliente = cliente,
         productos = listOf(ProductoPedido(producto, 1)),
         notas = "Pedido de demostración",
-        fecha = LocalDate.now()
+        fecha = fechaPedido
     )
     val pedidoCombinado = pedido + segundoPedido
     val (nombreCliente, correoCliente, telefonoCliente) = cliente
@@ -95,7 +107,9 @@ fun main() {
         appendLine("Clientes registrados: ${clientesRegistrados.size} | Productos registrados: ${productosRegistrados.size}")
         appendLine("Igualdad estructural (==): cliente=${cliente == clienteDuplicado}, producto=${producto == productoDuplicado}")
         appendLine("Igualdad referencial (===): cliente=${cliente === clienteDuplicado}, producto=${producto === productoDuplicado}")
-        appendLine("Fecha dentro del rango promocional: ${pedido.fecha in RANGO_PROMOCIONAL}")
+        appendLine("Fecha del pedido: $fechaPedido")
+        appendLine("Fecha dentro del rango promocional: $dentroDelPeriodoPromocional")
+        appendLine("Rango permitido de pizzas: ${cantidad in 1..100} (cantidad ingresada: $cantidad)")
         appendLine("=======================================================")
     }
 

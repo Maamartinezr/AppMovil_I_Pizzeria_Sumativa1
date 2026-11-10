@@ -1,5 +1,9 @@
 package pizzeria.util
 
+import java.time.LocalDate
+import java.time.format.DateTimeParseException
+import java.util.Locale
+
 private const val TELEFONO_PREDETERMINADO = "+00 (000) 000-0000"
 private const val CORREO_PREDETERMINADO = "correo@invalido.com"
 private val CORREO_REGEX = Regex("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")
@@ -34,15 +38,32 @@ fun leerTelefono(): String {
     }
 }
 
+/** Solicita una fecha ISO (AAAA-MM-DD) y vuelve a pedirla si no existe o no tiene formato válido. */
+fun leerFechaPedido(): LocalDate {
+    while (true) {
+        print("Fecha del pedido (AAAA-MM-DD, por ejemplo 2026-06-15): ")
+        val entrada = readLine()?.trim()
+        if (entrada.isNullOrEmpty()) {
+            println("La fecha no puede estar vacía. Inténtalo nuevamente.")
+            continue
+        }
+
+        try {
+            return LocalDate.parse(entrada)
+        } catch (_: DateTimeParseException) {
+            println("Fecha inválida. Usa el formato AAAA-MM-DD y una fecha real, por ejemplo 2026-06-15.")
+        }
+    }
+}
+
+/** Limita la cantidad ingresada al rango permitido, inclusive, de 1 a 100. */
 fun leerCantidad(): Int {
     while (true) {
         print("Cantidad de pizzas (1-100): ")
-        val cantidad = readLine()?.trim()?.toIntOrNull() ?: run {
-            println("Ingresa un número entero entre 1 y 100.")
-            continue
-        }
-        if (cantidad in 1..100) return cantidad
-        println("Cantidad fuera de rango. Ingresa un valor entre 1 y 100.")
+        val entrada = readLine()?.trim()
+        val cantidad = entrada?.toIntOrNull()
+        if (cantidad != null && cantidad in 1..100) return cantidad
+        println("Cantidad inválida. Ingresa un número entero entre 1 y 100.")
     }
 }
 
